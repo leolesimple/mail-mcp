@@ -2,28 +2,21 @@ import 'dotenv/config';
 import { z } from 'zod';
 
 /**
- * Booléen d'environnement tolérant, pour toutes les variables « interrupteur ».
- *
- * `false`, `0`, `no` (casse et espaces ignorés) → `false` ; toute autre chaîne
- * non vide → `true` ; variable absente ou vide → `defaultValue`.
- *
- * Volontairement PAS `z.coerce.boolean()` : en zod, la chaîne `"false"` est une
- * chaîne non vide, donc coercée à `true` — l'interrupteur serait silencieusement
- * inopérant. Verrouillé par `test/config.test.ts`.
+ * Booléen tolérant lu depuis l'environnement. Volontairement pas un
+ * `z.coerce.boolean()` : dans zod, la chaîne `"false"` est une chaîne non vide,
+ * donc coercée à `true` — un coupe-circuit `FLAG=false` serait silencieusement
+ * inopérant. Ici `"false"`, `"0"` et `"no"` (insensibles à la casse, espaces
+ * ignorés) valent faux ; toute autre valeur vaut vrai ; l'absence de variable
+ * retombe sur `defaultValue`.
  */
 export function envBool(defaultValue: boolean): z.ZodType<boolean, unknown> {
   return z
     .string()
     .optional()
-    .transform((v) => {
-      if (v === undefined || v.trim() === '') {
-        return defaultValue;
-      }
-      return !['false', '0', 'no'].includes(v.trim().toLowerCase());
-    }) as unknown as z.ZodType<boolean, unknown>;
+    .transform((v) => (v === undefined ? defaultValue : !['false', '0', 'no'].includes(v.trim().toLowerCase())));
 }
 
-/** Découpe une liste `"a, b ,,c"` en entrées normalisées (trim + lowercase, vides retirées). */
+/** Découpe une liste séparée par des virgules en entrées normalisées (trim, minuscules, vides retirées). */
 export function parseList(raw: string): string[] {
   return raw
     .split(',')
@@ -43,33 +36,34 @@ const envSchema = z.object({
   MCP_BEARER_TOKEN: z.string().min(16, 'MCP_BEARER_TOKEN doit faire au moins 16 caractères'),
   PORT: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
-  // Coupe-circuit historique pour send_message / reply_message : à `false`, le
-  // transport SMTP refuse tout envoi (garde-fou n°2, voir src/smtp/guards.ts).
+
+  // Coupe-circuit pour send_message / reply_message.
   ENABLE_SENDING: envBool(true),
 
-  // --- Garde-fous d'envoi gradués (src/smtp/guards.ts) -----------------------
-  // Adresses exactes (`a@exemple.com`) ou domaines (`@exemple.com`) séparés par
-  // des virgules. Vide = aucune restriction. Un envoi vers un destinataire hors
-  // liste (to, cc OU bcc) est refusé, avec les adresses fautives nommées.
+  // --- Garde-fous d'envoi (lot D) ------------------------------------------
+  // Taille maximale d'une pièce jointe, en octets.
+  ATTACHMENT_MAX_BYTES: z.coerce.number().int().positive().default(5_242_880),
+  // Destinataires autorisés : adresses ou domaines séparés par des virgules.
+  // Vide = aucun filtrage. Exposé aussi en tableau via ALLOWED_RECIPIENTS_LIST.
   ALLOWED_RECIPIENTS: z.string().default(''),
-  // Nombre maximum d'envois réussis sur une fenêtre glissante de 24 h. `0` =
-  // illimité. Compteur en mémoire, non persisté : un redémarrage le remet à zéro
-  // (choix assumé, voir docs/security.md).
-  MAX_SENDS_PER_DAY: z.coerce.number().int().min(0).default(0),
-  // À `true`, send_message / reply_message ne transmettent rien : ils déposent le
-  // message dans Drafts et renvoient un succès explicite (reason: 'DRAFTS_ONLY').
+  // Nombre maximal d'envois par jour glissant. 0 = illimité.
+  MAX_SENDS_PER_DAY: z.coerce.number().int().nonnegative().default(0),
+  // Force tous les envois à passer par un brouillon (aucun mail n'est émis).
   DRAFTS_ONLY: envBool(false),
-  // Mode « sans filet » : désactive les garde-fous d'envoi (n°2 à 5) ET le rate
-  // limit HTTP. Ne désactive JAMAIS l'auth bearer ni le TTL des sessions.
+  // Lève tous les garde-fous d'envoi. À n'utiliser qu'en connaissance de cause.
   UNRESTRICTED: envBool(false),
 
-  // --- Garde-fous HTTP (src/http/) ------------------------------------------
-  // Requêtes /mcp autorisées par IP et par minute (fenêtre glissante). Au-delà :
-  // 429. /health n'est jamais limité.
+  // --- Protocole MCP / sessions (lots C, E) -------------------------------
+  // Plafond d'appels par minute et par session.
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(120),
-  // Durée d'inactivité au-delà de laquelle une session MCP est évincée et son
-  // transport fermé. Empêche la Map de sessions de fuir.
+  // Durée de vie d'une session inactive, en millisecondes.
   SESSION_TTL_MS: z.coerce.number().int().positive().default(1_800_000),
+  // Transport exposé par le serveur MCP.
+  MCP_TRANSPORT: z
+    .enum(['http', 'stdio', 'both'], { message: 'MCP_TRANSPORT doit valoir "http", "stdio" ou "both"' })
+    .default('http'),
+  // Longueur maximale d'un corps de message (texte ou HTML) accepté par les outils.
+  MAX_BODY_CHARS: z.coerce.number().int().positive().default(20_000),
 });
 
 /** Valide un environnement arbitraire. Exporté pour les tests ; l'app utilise `config`. */
@@ -81,7 +75,7 @@ export function parseConfig(env: NodeJS.ProcessEnv = process.env) {
   }
   return {
     ...parsed.data,
-    /** `ALLOWED_RECIPIENTS` déjà découpé et normalisé — à consommer plutôt que la chaîne brute. */
+    /** `ALLOWED_RECIPIENTS` normalisé en tableau (vide = aucun filtrage). */
     ALLOWED_RECIPIENTS_LIST: parseList(parsed.data.ALLOWED_RECIPIENTS),
   };
 }

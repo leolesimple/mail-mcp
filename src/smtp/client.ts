@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { account } from '../account.js';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
 import { classifySmtpError, SmtpMessageError, SmtpNetworkError } from './errors.js';
@@ -7,13 +8,13 @@ import { checkSendAllowed } from './guards.js';
 const log = logger.child({ module: 'smtp' });
 
 const transporter = nodemailer.createTransport({
-  host: config.SMTP_HOST,
-  port: config.SMTP_PORT,
+  host: account.smtp.host,
+  port: account.smtp.port,
   secure: false, // STARTTLS sur le port 587, pas de TLS implicite
   requireTLS: true,
   auth: {
-    user: config.ICLOUD_EMAIL,
-    pass: config.ICLOUD_APP_PASSWORD,
+    user: account.email,
+    pass: account.password,
   },
   pool: true,
   maxConnections: config.SMTP_POOL_SIZE,
@@ -70,7 +71,7 @@ export async function sendMail(message: OutgoingMessage): Promise<SendResult> {
   }
 
   const mailOptions: MailOptions = {
-    from: config.ICLOUD_EMAIL,
+    from: account.email,
     to: message.to,
     cc: message.cc,
     bcc: message.bcc,
