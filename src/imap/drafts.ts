@@ -1,10 +1,10 @@
-import MailComposer from 'nodemailer/lib/mail-composer/index.js';
-import { config } from '../config.js';
 import { imapPool } from './pool.js';
 import { classifyImapError } from './errors.js';
 import { findSpecialFolder } from './special-folders.js';
 import { getMessage } from './messages.js';
 import { buildReplyHeaders } from './threading.js';
+import { composeRaw } from '../smtp/compose.js';
+import type { ComposeAttachment } from '../smtp/compose.js';
 
 export interface DraftInput {
   to?: string[];
@@ -15,6 +15,7 @@ export interface DraftInput {
   html?: string;
   replyFolder?: string;
   replyUid?: number;
+  attachments?: ComposeAttachment[];
 }
 
 export interface DraftResult {
@@ -49,8 +50,7 @@ export async function saveDraft(input: DraftInput): Promise<DraftResult> {
     throw new Error('Sujet requis, sauf en réponse à un message existant (replyFolder + replyUid).');
   }
 
-  const raw = await new MailComposer({
-    from: config.ICLOUD_EMAIL,
+  const raw = await composeRaw({
     to,
     cc: input.cc,
     bcc: input.bcc,
@@ -59,9 +59,8 @@ export async function saveDraft(input: DraftInput): Promise<DraftResult> {
     html: input.html,
     inReplyTo,
     references,
-  })
-    .compile()
-    .build();
+    attachments: input.attachments,
+  });
 
   try {
     return await imapPool.withConnection(async (client) => {

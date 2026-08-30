@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { getMessage } from '../../imap/messages.js';
+import { jsonResult } from '../result.js';
 import { logger } from '../../logger.js';
 
 const log = logger.child({ tool: 'get_message' });
@@ -11,8 +12,8 @@ export function registerGetMessageTool(server: McpServer): void {
     {
       title: 'Get message',
       description:
-        'Fetches the full content of a message by UID: headers, text/HTML body, and attachment metadata ' +
-        '(attachment binary content is not included).',
+        'Fetches the full content of a message by UID: headers, text/HTML body, and attachment metadata. ' +
+        'Each attachment carries a stable "index" — pass it to get_attachment to retrieve the binary content.',
       inputSchema: {
         folder: z.string().min(1).default('INBOX'),
         uid: z.coerce.number().int().positive().describe('IMAP UID of the message'),
@@ -21,7 +22,7 @@ export function registerGetMessageTool(server: McpServer): void {
     async ({ folder, uid }) => {
       log.info({ folder, uid }, 'fetching message');
       const message = await getMessage(folder, uid);
-      return { content: [{ type: 'text', text: JSON.stringify(message, null, 2) }] };
+      return jsonResult(message);
     },
   );
 }

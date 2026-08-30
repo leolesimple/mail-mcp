@@ -12,6 +12,8 @@ const envSchema = z.object({
   SMTP_POOL_SIZE: z.coerce.number().int().positive().default(2),
   MCP_BEARER_TOKEN: z.string().min(16, 'MCP_BEARER_TOKEN doit faire au moins 16 caractères'),
   PORT: z.coerce.number().int().positive().default(3000),
+  // Taille maximale (octets) d'une pièce jointe en lecture comme en envoi, cumul compris.
+  ATTACHMENT_MAX_BYTES: z.coerce.number().int().positive().default(5_242_880),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   // Coupe-circuit pour send_message / reply_message. Volontairement pas un simple
   // z.coerce.boolean() : dans zod, "false" est une chaîne non-vide donc coercée à `true`.
