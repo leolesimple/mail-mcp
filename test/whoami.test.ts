@@ -1,6 +1,7 @@
 import './helpers/env.js';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { config } from '../src/config.js';
 import { buildWhoami } from '../src/mcp/whoami.js';
 
 // Valeurs posées par test/helpers/env.ts — ce sont les « secrets » factices qui
@@ -35,45 +36,42 @@ describe('buildWhoami', () => {
     assert.equal(report.guardrails.sendingEnabled, false);
   });
 
-  it('affiche les garde-fous optionnels quand ils sont dans l’environnement', async () => {
-    const report = await buildWhoami(false, {
-      poolStats: noPool,
-      env: {
-        DRAFTS_ONLY: 'true',
-        UNRESTRICTED: 'false',
-        ALLOWED_RECIPIENTS: 'alice@example.com, bob@example.com',
-        MAX_SENDS_PER_DAY: '20',
-      },
-    });
-    assert.equal(report.guardrails.draftsOnly, true);
-    assert.equal(report.guardrails.unrestricted, false);
-    assert.equal(report.guardrails.allowlistActive, true);
-    assert.equal(report.guardrails.maxSendsPerDay, 20);
+  it('rapporte tous les garde-fous, tels que la configuration validée les définit', async () => {
+    const report = await buildWhoami(false, { poolStats: noPool });
+
+    // Les clés viennent de src/config.ts : elles ont toujours une valeur, jamais undefined.
+    assert.equal(report.guardrails.sendingEnabled, config.ENABLE_SENDING);
+    assert.equal(report.guardrails.draftsOnly, config.DRAFTS_ONLY);
+    assert.equal(report.guardrails.unrestricted, config.UNRESTRICTED);
+    assert.equal(report.guardrails.maxSendsPerDay, config.MAX_SENDS_PER_DAY);
   });
 
-  it('omet les garde-fous optionnels absents (tolérant au lot D non mergé)', async () => {
-    const report = await buildWhoami(false, { poolStats: noPool, env: {} });
-    assert.equal(report.guardrails.draftsOnly, undefined);
-    assert.equal(report.guardrails.unrestricted, undefined);
-    assert.equal(report.guardrails.allowlistActive, undefined);
-    assert.equal(report.guardrails.maxSendsPerDay, undefined);
-    assert.equal(report.guardrails.quota, undefined);
+  it('traite une allowlist vide comme inactive', async () => {
+    const report = await buildWhoami(false, { poolStats: noPool });
+    assert.equal(report.guardrails.allowlistActive, config.ALLOWED_RECIPIENTS_LIST.length > 0);
   });
 
-  it('traite ALLOWED_RECIPIENTS vide comme allowlist inactive', async () => {
+  it('rapporte le quota d’envoi tel que le compte le module de quota', async () => {
     const report = await buildWhoami(false, {
       poolStats: noPool,
-      env: { ALLOWED_RECIPIENTS: '  ,  ' },
+      quota: () => ({ windowHours: 24, limit: 50, unlimited: false, used: 3, remaining: 47 }),
     });
-    assert.equal(report.guardrails.allowlistActive, false);
+    assert.deepEqual(report.guardrails.quota, {
+      windowHours: 24,
+      limit: 50,
+      unlimited: false,
+      used: 3,
+      remaining: 47,
+    });
   });
 
-  it('inclut le quota restant si un fournisseur est branché (lot D)', async () => {
+  it('signale un quota illimité sans le confondre avec un quota épuisé', async () => {
     const report = await buildWhoami(false, {
       poolStats: noPool,
-      quota: () => ({ windowHours: 24, limit: 50, remaining: 47 }),
+      quota: () => ({ windowHours: 24, limit: 0, unlimited: true, used: 12, remaining: null }),
     });
-    assert.deepEqual(report.guardrails.quota, { windowHours: 24, limit: 50, remaining: 47 });
+    assert.equal(report.guardrails.quota?.unlimited, true);
+    assert.equal(report.guardrails.quota?.remaining, null);
   });
 
   it('rapporte le résultat d’une sonde de connexion réussie', async () => {

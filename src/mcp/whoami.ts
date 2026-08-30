@@ -1,4 +1,5 @@
 import { config } from '../config.js';
+import { getQuotaStatus } from '../smtp/quota.js';
 import { account } from '../account.js';
 import { serverVersion } from '../version.js';
 import { imapPool } from '../imap/pool.js';
@@ -25,7 +26,13 @@ export interface WhoamiGuardrails {
 export interface WhoamiQuota {
   windowHours: number;
   limit: number;
-  remaining: number;
+  /** `true` quand `MAX_SENDS_PER_DAY = 0` : aucun plafond. */
+  unlimited: boolean;
+  used: number;
+  /** `null` quand le quota est illimité. */
+  remaining: number | null;
+  /** Instant où le plus ancien envoi sort de la fenêtre. */
+  resetsAt?: string;
 }
 
 export interface WhoamiReport {
@@ -42,37 +49,12 @@ export interface WhoamiReport {
 }
 
 export interface WhoamiDeps {
-  /** Environnement à inspecter pour les garde-fous optionnels. Défaut : `process.env`. */
-  env?: NodeJS.ProcessEnv;
   /** Photo du pool IMAP. Défaut : `imapPool.stats()`. */
   poolStats?: () => { open: number; inUse: number; max: number };
   /** Vérification de connexion réelle et légère. Défaut : `listFolders()`. */
   probe?: () => Promise<{ folderCount: number }>;
   /** Quota d'envoi restant, si le lot D l'expose. Défaut : indisponible. */
   quota?: () => WhoamiQuota | undefined;
-}
-
-/** `false` / `0` / `no` → false ; toute autre valeur non vide → true ; absent/vide → undefined. */
-function optionalFlag(raw: string | undefined): boolean | undefined {
-  if (raw === undefined) return undefined;
-  const value = raw.trim().toLowerCase();
-  if (value === '') return undefined;
-  return !['false', '0', 'no'].includes(value);
-}
-
-/** Présent et non vide → allowlist active. Absent → undefined (le lot D ne l'a pas posée). */
-function parseAllowlist(raw: string | undefined): boolean | undefined {
-  if (raw === undefined) return undefined;
-  return raw
-    .split(',')
-    .map((entry) => entry.trim())
-    .some((entry) => entry.length > 0);
-}
-
-function parseMaxSends(raw: string | undefined): number | undefined {
-  if (raw === undefined || raw.trim() === '') return undefined;
-  const value = Number(raw);
-  return Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
 const defaultProbe = async (): Promise<{ folderCount: number }> => {
@@ -95,26 +77,32 @@ function redactSecrets(text: string): string {
   return out;
 }
 
+/** Quota d'envoi tel que le lot D le comptabilise, sans effet de bord. */
+function defaultQuota(): WhoamiQuota {
+  const status = getQuotaStatus();
+  return {
+    windowHours: 24,
+    limit: status.limit,
+    unlimited: status.unlimited,
+    used: status.used,
+    remaining: status.remaining,
+    resetsAt: status.resetsAt?.toISOString(),
+  };
+}
+
 export async function buildWhoami(probeRequested: boolean, deps: WhoamiDeps = {}): Promise<WhoamiReport> {
-  const env = deps.env ?? process.env;
   const poolStats = deps.poolStats ?? (() => imapPool.stats());
   const probe = deps.probe ?? defaultProbe;
 
   const guardrails: WhoamiGuardrails = { sendingEnabled: config.ENABLE_SENDING };
 
-  const draftsOnly = optionalFlag(env.DRAFTS_ONLY);
-  if (draftsOnly !== undefined) guardrails.draftsOnly = draftsOnly;
+  guardrails.draftsOnly = config.DRAFTS_ONLY;
+  guardrails.unrestricted = config.UNRESTRICTED;
+  guardrails.allowlistActive = config.ALLOWED_RECIPIENTS_LIST.length > 0;
+  guardrails.maxSendsPerDay = config.MAX_SENDS_PER_DAY;
 
-  const unrestricted = optionalFlag(env.UNRESTRICTED);
-  if (unrestricted !== undefined) guardrails.unrestricted = unrestricted;
-
-  const allowlistActive = parseAllowlist(env.ALLOWED_RECIPIENTS);
-  if (allowlistActive !== undefined) guardrails.allowlistActive = allowlistActive;
-
-  const maxSendsPerDay = parseMaxSends(env.MAX_SENDS_PER_DAY);
-  if (maxSendsPerDay !== undefined) guardrails.maxSendsPerDay = maxSendsPerDay;
-
-  const quota = deps.quota?.();
+  // Lecture seule : afficher le quota ne doit jamais consommer un crédit d'envoi.
+  const quota = (deps.quota ?? defaultQuota)();
   if (quota !== undefined) guardrails.quota = quota;
 
   const report: WhoamiReport = {

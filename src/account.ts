@@ -1,12 +1,9 @@
 import { config } from './config.js';
 
 /**
- * Vue « compte mail » de la configuration : les identifiants et les points de
- * connexion, regroupés sous une forme stable que les couches basses et les
- * outils peuvent consommer sans connaître le schéma d'environnement complet.
- *
- * Contrat partagé avec le lot 0 (socle) — au merge, c'est la version du lot 0
- * qui fait foi.
+ * Compte mail unique dérivé de la configuration. Point d'accès unique aux
+ * identifiants et aux serveurs, pour préparer un éventuel multi-compte sans
+ * l'implémenter : rien n'expose de notion de compte aux outils MCP aujourd'hui.
  */
 export interface MailAccount {
   email: string;
