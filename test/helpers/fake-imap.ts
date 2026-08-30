@@ -124,7 +124,7 @@ export interface FakeMessageInput extends Partial<Omit<FakeStoredMessage, 'flags
   flags?: Iterable<string>;
 }
 
-interface FakeMailbox {
+interface FakeMailboxState {
   messages: FakeStoredMessage[];
   specialUse?: string;
   subscribed: boolean;
@@ -257,7 +257,7 @@ function renderHeaders(message: FakeStoredMessage): string {
 
 export class FakeMail extends EventEmitter {
   usable = true;
-  readonly mailboxes = new Map<string, FakeMailbox>();
+  readonly mailboxes = new Map<string, FakeMailboxState>();
   selected: string | null = null;
   nextUid = 1000;
   readonly counters = { move: 0, delete: 0, flagAdd: 0, flagRemove: 0, status: 0, append: 0, search: 0 };
@@ -450,13 +450,13 @@ export class FakeMail extends EventEmitter {
 
   // --- Interne -----------------------------------------------------------
 
-  private require(path: string): FakeMailbox {
+  private require(path: string): FakeMailboxState {
     const mailbox = this.mailboxes.get(path);
     if (!mailbox) throw new Error(`Mailbox "${path}" not found`);
     return mailbox;
   }
 
-  private currentMailbox(): FakeMailbox {
+  private currentMailbox(): FakeMailboxState {
     if (!this.selected) throw new Error('No mailbox selected');
     return this.require(this.selected);
   }
