@@ -1,28 +1,30 @@
 import type { Server } from 'node:http';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { createHttpServer, closeAllSessions } from './http/server.js';
+import { createHttpServer } from './http/server.js';
 import { createMailMcpServer } from './mcp/server.js';
 import { imapPool } from './imap/pool.js';
 import { closeSmtp } from './smtp/client.js';
 import { config } from './config.js';
 import { logger } from './logger.js';
 
-// C1 — transport MCP sélectionnable. Le montage HTTP est conditionnel : en
-// `stdio` pur il n'y a pas de serveur HTTP à démarrer ni à fermer.
+// Transport MCP sélectionnable. Le montage HTTP est conditionnel : en `stdio`
+// pur il n'y a ni serveur HTTP à démarrer, ni balayage de sessions à arrêter.
 const useHttp = config.MCP_TRANSPORT === 'http' || config.MCP_TRANSPORT === 'both';
 const useStdio = config.MCP_TRANSPORT === 'stdio' || config.MCP_TRANSPORT === 'both';
 
 const cleanups: Array<() => void | Promise<void>> = [];
 
 if (useHttp) {
-  const app = createHttpServer();
-  const httpServer: Server = app.listen(config.PORT, '0.0.0.0', () => {
+  const http = createHttpServer();
+  const httpServer: Server = http.app.listen(config.PORT, '0.0.0.0', () => {
     logger.info({ port: config.PORT }, 'mail-mcp http server listening');
   });
   cleanups.push(() => {
     httpServer.close();
   });
-  cleanups.push(closeAllSessions);
+  // Ferme les sessions MCP encore ouvertes et arrête le balayage périodique
+  // (l'intervalle est unref'd, mais on ne laisse pas de session pendante).
+  cleanups.push(() => http.close());
 }
 
 if (useStdio) {

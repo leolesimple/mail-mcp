@@ -89,21 +89,17 @@ Concrètement, une fois branché, on peut demander à Claude :
 git clone https://github.com/leolesimple/mail-mcp.git
 cd mail-mcp
 npm install
-cp .env.example .env
+npm run auth
 ```
 
-Renseigner dans `.env` :
+`npm run auth` demande l'adresse iCloud et le mot de passe d'application (saisie
+masquée), génère le `MCP_BEARER_TOKEN`, **vérifie pour de vrai les connexions IMAP
+et SMTP**, puis écrit `.env` en `chmod 600` — rien n'est écrit si une vérification
+échoue, et un `.env` existant est sauvegardé en `.env.bak` avant tout écrasement.
+Le fichier généré démarre avec `ENABLE_SENDING=false`.
 
 ```bash
-ICLOUD_EMAIL=vous@icloud.com
-ICLOUD_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
-MCP_BEARER_TOKEN=$(openssl rand -hex 32)   # à générer, puis coller la valeur
-```
-
-Vérifier que la connexion iCloud passe, avant même de parler de MCP :
-
-```bash
-npm run verify:imap    # se connecte en IMAP et affiche vos dossiers
+npm run auth:check     # rejoue la vérification IMAP + SMTP sur le .env existant, sans rien écrire
 ```
 
 Puis démarrer :
@@ -164,13 +160,10 @@ Détail complet dans [`docs/security.md`](docs/security.md).
 
 ## Limitations connues
 
-- **Pas de pièces jointes.** `get_message` renvoie les métadonnées (nom, type, taille) mais pas le
-  contenu binaire, et l'envoi ne permet pas d'en joindre.
-- **Les messages envoyés n'apparaissent pas dans « Sent Messages ».** iCloud ne classe pas
-  automatiquement ce qui part par SMTP externe, contrairement à Mail.app.
-- **Pas de pagination.** `list_messages` et `search_messages` renvoient les N plus récents
-  (`limit`, 200 max) sans curseur pour aller plus loin.
-- **Pas de gestion de dossiers** (création, renommage, suppression).
+- **Pièces jointes plafonnées à `ATTACHMENT_MAX_BYTES` (5 Mo par défaut).** `get_attachment`
+  récupère le binaire d'une pièce jointe et `send_message` / `reply_message` / `forward_message` /
+  `save_draft` permettent d'en joindre, mais au-delà de cette limite (cumul compris) l'outil refuse
+  explicitement plutôt que de tronquer.
 - **iCloud uniquement en pratique.** Le code est du IMAP/SMTP standard et les hôtes sont
   configurables, mais rien d'autre n'est testé.
 

@@ -1,11 +1,25 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { searchMessages } from '../../imap/messages.js';
+import { searchMessages, searchMessagesAcross } from '../../imap/messages.js';
+import type { SearchMessagesOptions } from '../../imap/messages.js';
+import { hasSearchCriteria } from '../../imap/search-query.js';
+import { listResult, errorResult } from '../result.js';
 import { searchMessagesResultSchema } from '../schemas.js';
-import { errorResult, listResult } from '../result.js';
 import { logger } from '../../logger.js';
 
 const log = logger.child({ tool: 'search_messages' });
+
+const isoDate = z.union([z.iso.date(), z.iso.datetime({ offset: true, local: true })]);
+
+const textCriteria = z
+  .object({
+    subject: z.string().optional(),
+    body: z.string().optional(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+    text: z.string().optional().describe('Matches anywhere in headers or body'),
+  })
+  .describe('A set of text criteria');
 
 export function registerSearchMessagesTool(server: McpServer): void {
   server.registerTool(
@@ -13,31 +27,92 @@ export function registerSearchMessagesTool(server: McpServer): void {
     {
       title: 'Search messages',
       description:
-        'Searches messages in a folder using the native IMAP SEARCH command (subject, body, sender, recipient). ' +
-        'At least one of subject/body/from/to is required. The text block is a bare array; structuredContent ' +
-        'wraps it under a "messages" key.',
+        'Searches messages with the native IMAP SEARCH command. Criteria are combined with AND. Supports ' +
+        'text (subject/body/from/to/text), date range (since/before), unreadOnly, flagged, negation (not), ' +
+        'alternation (or), pagination (beforeUid → nextCursor), and multi-folder search (folders[]). ' +
+        'At least one real criterion is required. Returns { messages, nextCursor? }; with folders[], each ' +
+        'message is tagged with its "folder" and no cursor is returned.',
       inputSchema: {
-        folder: z.string().min(1).default('INBOX'),
+        folder: z.string().min(1).default('INBOX').describe('Single folder to search (ignored if folders[] is set)'),
+        folders: z
+          .array(z.string().min(1))
+          .min(1)
+          .optional()
+          .describe('Search several folders; results merged and each tagged with its folder'),
         subject: z.string().optional(),
         body: z.string().optional(),
         from: z.string().optional(),
         to: z.string().optional(),
-        limit: z.coerce.number().int().positive().max(200).default(50),
+        text: z.string().optional().describe('Matches anywhere in headers or body'),
+        since: isoDate.optional().describe('Messages received on or after this date (ISO 8601)'),
+        before: isoDate.optional().describe('Messages received before this date (ISO 8601)'),
+        unreadOnly: z.boolean().optional(),
+        flagged: z.boolean().optional().describe('Only starred (flagged) messages'),
+        not: textCriteria.optional().describe('Text criteria to exclude'),
+        or: z.array(textCriteria).optional().describe('Branches; at least one must match'),
+        beforeUid: z.coerce.number().int().positive().optional().describe('Pagination cursor (single-folder only)'),
         envelope: z
           .boolean()
           .default(false)
-          .describe('Wrap the text block under a "messages" key too (structuredContent always is)'),
+          .describe(
+            'Wrap the text block as { messages, nextCursor? } instead of a bare array. ' +
+              'Forced on whenever a nextCursor exists.',
+          ),
+        limit: z.coerce.number().int().positive().max(200).default(50),
       },
       outputSchema: searchMessagesResultSchema.shape,
     },
-    async ({ folder, subject, body, from, to, limit, envelope }) => {
-      if (!subject && !body && !from && !to) {
-        return errorResult('Au moins un critère de recherche est requis (subject, body, from ou to).');
+    async ({
+      folder,
+      folders,
+      subject,
+      body,
+      from,
+      to,
+      text,
+      since,
+      before,
+      unreadOnly,
+      flagged,
+      not,
+      or,
+      beforeUid,
+      envelope,
+      limit,
+    }) => {
+      const options: SearchMessagesOptions = {
+        subject,
+        body,
+        from,
+        to,
+        text,
+        since: since ? new Date(since) : undefined,
+        before: before ? new Date(before) : undefined,
+        unreadOnly,
+        flagged,
+        not,
+        or,
+        beforeUid,
+        limit,
+      };
+
+      if (!hasSearchCriteria(options)) {
+        return errorResult(
+          'Au moins un critère de recherche est requis (subject, body, from, to, text, since, before, ' +
+            'unreadOnly, flagged, not ou or).',
+        );
       }
 
-      log.info({ folder, subject, from, to }, 'searching messages');
-      const messages = await searchMessages(folder, { subject, body, from, to, limit });
-      return listResult('messages', messages, { envelope });
+      if (folders && folders.length > 0) {
+        log.info({ folders, subject, from }, 'searching messages (multi-folder)');
+        const result = await searchMessagesAcross(folders, options);
+        return listResult('messages', result.messages, { envelope });
+      }
+
+      log.info({ folder, subject, from, beforeUid }, 'searching messages');
+      const page = await searchMessages(folder, options);
+      // Compat : tableau nu par défaut ; enveloppé sur demande, ou dès qu'un curseur existe.
+      return listResult('messages', page.messages, { envelope, nextCursor: page.nextCursor });
     },
   );
 }

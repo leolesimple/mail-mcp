@@ -47,7 +47,7 @@ export function jsonResult(data: unknown, schema?: z.ZodType): CallToolResult {
 export function listResult<T>(
   key: string,
   items: T[],
-  options: { envelope?: boolean; nextCursor?: string } = {},
+  options: { envelope?: boolean; nextCursor?: number | string } = {},
 ): CallToolResult {
   const enveloped: Record<string, unknown> = { [key]: items };
   if (options.nextCursor !== undefined) {

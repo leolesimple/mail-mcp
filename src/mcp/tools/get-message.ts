@@ -18,7 +18,8 @@ export function registerGetMessageTool(server: McpServer): void {
         'Fetches the full content of a message by UID: headers, plain-text body, and attachment metadata. ' +
         'The body is truncated to maxBodyChars (bodyTruncated flags it). The raw HTML body is omitted unless ' +
         'includeHtml is true. When the message has no text part, the body is derived from its HTML. ' +
-        'Attachment binary content is never included.',
+        'Attachment binary content is never included: each attachment carries a stable "index" — pass it to ' +
+        'get_attachment to retrieve the bytes.',
       inputSchema: {
         folder: z.string().min(1).default('INBOX'),
         uid: z.coerce.number().int().positive().describe('IMAP UID of the message'),

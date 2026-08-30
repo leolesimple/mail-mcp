@@ -1,12 +1,9 @@
 import { config } from './config.js';
 
 /**
- * Identité du compte mail, dérivée de la configuration. Point d'accès unique
- * aux identifiants pour le code qui ouvre une connexion hors des pools
- * IMAP/SMTP (par exemple la connexion IDLE de `wait_for_new_message`).
- *
- * NOTE (lot C) : fichier appartenant au lot 0. Créé ici à l'identique du
- * contrat pour pouvoir compiler ; la version du lot 0 fait foi au merge.
+ * Compte mail unique dérivé de la configuration. Point d'accès unique aux
+ * identifiants et aux serveurs, pour préparer un éventuel multi-compte sans
+ * l'implémenter : rien n'expose de notion de compte aux outils MCP aujourd'hui.
  */
 export interface MailAccount {
   email: string;
