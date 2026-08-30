@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { searchMessages } from '../../imap/messages.js';
+import { searchMessagesResultSchema } from '../schemas.js';
+import { errorResult, listResult } from '../result.js';
 import { logger } from '../../logger.js';
 
 const log = logger.child({ tool: 'search_messages' });
@@ -12,7 +14,8 @@ export function registerSearchMessagesTool(server: McpServer): void {
       title: 'Search messages',
       description:
         'Searches messages in a folder using the native IMAP SEARCH command (subject, body, sender, recipient). ' +
-        'At least one of subject/body/from/to is required.',
+        'At least one of subject/body/from/to is required. The text block is a bare array; structuredContent ' +
+        'wraps it under a "messages" key.',
       inputSchema: {
         folder: z.string().min(1).default('INBOX'),
         subject: z.string().optional(),
@@ -20,21 +23,21 @@ export function registerSearchMessagesTool(server: McpServer): void {
         from: z.string().optional(),
         to: z.string().optional(),
         limit: z.coerce.number().int().positive().max(200).default(50),
+        envelope: z
+          .boolean()
+          .default(false)
+          .describe('Wrap the text block under a "messages" key too (structuredContent always is)'),
       },
+      outputSchema: searchMessagesResultSchema.shape,
     },
-    async ({ folder, subject, body, from, to, limit }) => {
+    async ({ folder, subject, body, from, to, limit, envelope }) => {
       if (!subject && !body && !from && !to) {
-        return {
-          isError: true,
-          content: [
-            { type: 'text', text: 'Au moins un critère de recherche est requis (subject, body, from ou to).' },
-          ],
-        };
+        return errorResult('Au moins un critère de recherche est requis (subject, body, from ou to).');
       }
 
       log.info({ folder, subject, from, to }, 'searching messages');
       const messages = await searchMessages(folder, { subject, body, from, to, limit });
-      return { content: [{ type: 'text', text: JSON.stringify(messages, null, 2) }] };
+      return listResult('messages', messages, { envelope });
     },
   );
 }

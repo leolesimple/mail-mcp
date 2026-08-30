@@ -110,6 +110,27 @@ export async function searchMessages(folder: string, options: SearchMessagesOpti
   return withMailbox(folder, (client) => fetchSummaries(client, query, options.limit), { readOnly: true });
 }
 
+/**
+ * Source RFC 5322 brute d'un message (en-têtes + corps), telle quelle.
+ *
+ * NOTE (lot C) : fonction appartenant au lot A. Créée ici à l'identique du
+ * contrat (fetch `{ source: true }`, comme `getMessage`) pour pouvoir compiler
+ * `get_message` avec `includeRawHeaders` ; la version du lot A fait foi au merge.
+ */
+export async function getMessageSource(folder: string, uid: number): Promise<Buffer> {
+  return withMailbox(
+    folder,
+    async (client) => {
+      const fetched = await client.fetchOne(uid, { uid: true, source: true }, { uid: true });
+      if (!fetched || !fetched.source) {
+        throw new Error(`Message UID ${uid} introuvable dans "${folder}"`);
+      }
+      return fetched.source;
+    },
+    { readOnly: true },
+  );
+}
+
 export async function getMessage(folder: string, uid: number): Promise<FullMessage> {
   return withMailbox(
     folder,

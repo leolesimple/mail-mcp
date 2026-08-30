@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { deleteMessage } from '../../imap/mutations.js';
+import { deleteResultSchema } from '../schemas.js';
+import { jsonResult } from '../result.js';
 import { logger } from '../../logger.js';
 
 const log = logger.child({ tool: 'delete_message' });
@@ -17,11 +19,12 @@ export function registerDeleteMessageTool(server: McpServer): void {
         folder: z.string().min(1),
         uid: z.coerce.number().int().positive(),
       },
+      outputSchema: deleteResultSchema.shape,
     },
     async ({ folder, uid }) => {
       log.info({ folder, uid }, 'deleting message');
       const result = await deleteMessage(folder, uid);
-      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      return jsonResult(result, deleteResultSchema);
     },
   );
 }
