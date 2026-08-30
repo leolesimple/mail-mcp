@@ -86,6 +86,15 @@ export class ImapConnectionPool {
     }
   }
 
+  /** Photo de l'état du pool : connexions ouvertes, en cours d'utilisation, plafond. */
+  stats(): { open: number; inUse: number; max: number } {
+    return {
+      open: this.entries.length,
+      inUse: this.entries.filter((e) => e.inUse).length,
+      max: this.maxSize,
+    };
+  }
+
   async close(): Promise<void> {
     this.closed = true;
 

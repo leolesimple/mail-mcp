@@ -9,11 +9,13 @@ import { registerMoveMessageTool } from './tools/move-message.js';
 import { registerDeleteMessageTool } from './tools/delete-message.js';
 import { registerFlagMessageTool } from './tools/flag-message.js';
 import { registerSaveDraftTool } from './tools/save-draft.js';
+import { registerWhoamiTool } from './tools/whoami.js';
+import { serverVersion } from '../version.js';
 
 export function createMailMcpServer(): McpServer {
   const server = new McpServer({
     name: 'icloud-mail',
-    version: '0.1.0',
+    version: serverVersion,
   });
 
   registerListFoldersTool(server);
@@ -26,6 +28,7 @@ export function createMailMcpServer(): McpServer {
   registerDeleteMessageTool(server);
   registerFlagMessageTool(server);
   registerSaveDraftTool(server);
+  registerWhoamiTool(server);
 
   return server;
 }
