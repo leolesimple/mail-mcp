@@ -12,30 +12,43 @@ export function registerFlagMessageTool(server: McpServer): void {
     {
       title: 'Flag message',
       description:
-        'Marks one message (uid) or up to 200 messages (uids) as read/unread and/or starred (flagged)/' +
-        'unstarred, in a single IMAP command. Exactly one of uid / uids is required.',
+        'Changes flags on one message (uid) or up to 200 messages (uids), in a single IMAP command: ' +
+        'read/unread, starred/unstarred, answered/unanswered, junk/not_junk. Pass keywords for arbitrary ' +
+        'IMAP keywords. Additions are applied before removals. Exactly one of uid / uids is required.',
       inputSchema: {
         folder: z.string().min(1).default('INBOX'),
         uid: z.coerce.number().int().positive().optional(),
         uids: z.array(z.coerce.number().int().positive()).min(1).max(BULK_UID_LIMIT).optional(),
         actions: z
-          .array(z.enum(['read', 'unread', 'flagged', 'unflagged']))
+          .array(
+            z.enum([
+              'read',
+              'unread',
+              'flagged',
+              'unflagged',
+              'answered',
+              'unanswered',
+              'junk',
+              'not_junk',
+            ]),
+          )
           .min(1)
           .describe('One or more flag changes to apply'),
+        keywords: z.array(z.string().min(1)).optional().describe('Arbitrary IMAP keywords to add'),
       },
     },
-    async ({ folder, uid, uids, actions }) => {
+    async ({ folder, uid, uids, actions, keywords }) => {
       if ((uid === undefined) === (uids === undefined)) {
         return errorResult('Fournir exactement un de "uid" (un message) ou "uids" (jusqu\'à 200 messages).');
       }
 
       if (uids) {
-        log.info({ folder, count: uids.length, actions }, 'flagging messages (bulk)');
-        return jsonResult(await flagMessages(folder, uids, actions));
+        log.info({ folder, count: uids.length, actions, keywords }, 'flagging messages (bulk)');
+        return jsonResult(await flagMessages(folder, uids, actions, keywords));
       }
 
-      log.info({ folder, uid, actions }, 'flagging message');
-      return jsonResult(await flagMessage(folder, uid as number, actions));
+      log.info({ folder, uid, actions, keywords }, 'flagging message');
+      return jsonResult(await flagMessage(folder, uid as number, actions, keywords));
     },
   );
 }

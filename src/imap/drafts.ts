@@ -1,7 +1,5 @@
-import MailComposer from 'nodemailer/lib/mail-composer/index.js';
 import { simpleParser } from 'mailparser';
 import type { ImapFlow } from 'imapflow';
-import { config } from '../config.js';
 import { imapPool } from './pool.js';
 import { classifyImapError } from './errors.js';
 import { findSpecialFolder } from './special-folders.js';
@@ -9,7 +7,11 @@ import { getMessage } from './messages.js';
 import { buildReplyHeaders } from './threading.js';
 import { sendMail } from '../smtp/client.js';
 import type { SendResult } from '../smtp/client.js';
+import { composeRaw } from '../smtp/compose.js';
+import type { ComposeAttachment } from '../smtp/compose.js';
 import { SmtpAuthError, SmtpMessageError, SmtpNetworkError } from '../smtp/errors.js';
+import { checkSendAllowed } from '../smtp/guards.js';
+import { sendQuota } from '../smtp/quota.js';
 
 /** Les erreurs SMTP portent déjà un message utilisateur : ne pas les reclasser en erreur IMAP. */
 function rethrowClassified(err: unknown): never {
@@ -28,6 +30,7 @@ export interface DraftInput {
   html?: string;
   replyFolder?: string;
   replyUid?: number;
+  attachments?: ComposeAttachment[];
 }
 
 export interface DraftResult {
@@ -68,8 +71,7 @@ async function composeDraft(input: DraftInput): Promise<ComposedDraft> {
     throw new Error('Sujet requis, sauf en réponse à un message existant (replyFolder + replyUid).');
   }
 
-  const raw = await new MailComposer({
-    from: config.ICLOUD_EMAIL,
+  const raw = await composeRaw({
     to,
     cc: input.cc,
     bcc: input.bcc,
@@ -78,9 +80,8 @@ async function composeDraft(input: DraftInput): Promise<ComposedDraft> {
     html: input.html,
     inReplyTo,
     references,
-  })
-    .compile()
-    .build();
+    attachments: input.attachments,
+  });
 
   return { raw, to };
 }
@@ -142,7 +143,10 @@ export async function updateDraft(uid: number, input: DraftInput): Promise<Updat
 }
 
 export interface SendDraftResult {
-  send: SendResult;
+  /** `undefined` si le message n'est pas parti (voir `reason`). */
+  send?: SendResult;
+  /** Renseigné quand les garde-fous ont dévié l'envoi (DRAFTS_ONLY). */
+  reason?: 'DRAFTS_ONLY';
   /** Le brouillon a été recopié dans le dossier Sent. */
   copiedToSent: boolean;
   /** Le brouillon d'origine a été supprimé du dossier Drafts. */
@@ -185,10 +189,23 @@ export async function sendDraftOn(
     throw new Error(`Le brouillon UID ${uid} n'a pas de destinataire : impossible de l'envoyer.`);
   }
 
+  const cc = addresses(parsed.cc);
+  const bcc = addresses(parsed.bcc);
+
+  // Mêmes garde-fous que send_message / reply_message. En DRAFTS_ONLY le
+  // brouillon est déjà dans Drafts : on le laisse intact, sans doublon.
+  const decision = checkSendAllowed({ to, cc, bcc });
+  if (decision.action === 'deny') {
+    throw new SmtpMessageError(decision.reason);
+  }
+  if (decision.action === 'draft') {
+    return { copiedToSent: false, draftDeleted: false, reason: 'DRAFTS_ONLY' };
+  }
+
   const send = await sendMail({
     to,
-    cc: addresses(parsed.cc),
-    bcc: addresses(parsed.bcc),
+    cc,
+    bcc,
     subject: parsed.subject ?? '',
     text: parsed.text,
     html: parsed.html || undefined,
@@ -199,6 +216,8 @@ export async function sendDraftOn(
         ? [parsed.references]
         : undefined,
   });
+
+  sendQuota.record();
 
   let copiedToSent = false;
   if (sentPath) {

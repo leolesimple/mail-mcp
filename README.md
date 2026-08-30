@@ -164,10 +164,10 @@ Détail complet dans [`docs/security.md`](docs/security.md).
 
 ## Limitations connues
 
-- **Pas de pièces jointes.** `get_message` renvoie les métadonnées (nom, type, taille) mais pas le
-  contenu binaire, et l'envoi ne permet pas d'en joindre.
-- **Les messages envoyés n'apparaissent pas dans « Sent Messages ».** iCloud ne classe pas
-  automatiquement ce qui part par SMTP externe, contrairement à Mail.app.
+- **Pièces jointes plafonnées à `ATTACHMENT_MAX_BYTES` (5 Mo par défaut).** `get_attachment`
+  récupère le binaire d'une pièce jointe et `send_message` / `reply_message` / `forward_message` /
+  `save_draft` permettent d'en joindre, mais au-delà de cette limite (cumul compris) l'outil refuse
+  explicitement plutôt que de tronquer.
 - **iCloud uniquement en pratique.** Le code est du IMAP/SMTP standard et les hôtes sont
   configurables, mais rien d'autre n'est testé.
 
