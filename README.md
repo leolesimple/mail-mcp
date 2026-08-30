@@ -168,9 +168,6 @@ Détail complet dans [`docs/security.md`](docs/security.md).
   contenu binaire, et l'envoi ne permet pas d'en joindre.
 - **Les messages envoyés n'apparaissent pas dans « Sent Messages ».** iCloud ne classe pas
   automatiquement ce qui part par SMTP externe, contrairement à Mail.app.
-- **Pas de pagination.** `list_messages` et `search_messages` renvoient les N plus récents
-  (`limit`, 200 max) sans curseur pour aller plus loin.
-- **Pas de gestion de dossiers** (création, renommage, suppression).
 - **iCloud uniquement en pratique.** Le code est du IMAP/SMTP standard et les hôtes sont
   configurables, mais rien d'autre n'est testé.
 

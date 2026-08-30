@@ -1,6 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { addressList, buildReplyHeaders, replyReferences, replySubject } from '../src/imap/threading.js';
+import {
+  addressList,
+  buildReplyHeaders,
+  normalizeSubject,
+  replyReferences,
+  replySubject,
+} from '../src/imap/threading.js';
 import type { ThreadableMessage } from '../src/imap/threading.js';
 
 function message(overrides: Partial<ThreadableMessage> = {}): ThreadableMessage {
@@ -31,6 +37,37 @@ describe('replySubject', () => {
   it('ne confond pas un sujet qui commence par un mot en "re"', () => {
     assert.equal(replySubject('Rendez-vous demain'), 'Re: Rendez-vous demain');
     assert.equal(replySubject('Retard de livraison'), 'Re: Retard de livraison');
+  });
+});
+
+describe('normalizeSubject', () => {
+  it('retire un préfixe simple', () => {
+    assert.equal(normalizeSubject('Re: Facture'), 'Facture');
+    assert.equal(normalizeSubject('Fwd: Facture'), 'Facture');
+  });
+
+  it('retire les préfixes empilés en une passe', () => {
+    assert.equal(normalizeSubject('Re: Re: Fwd: Facture de juillet'), 'Facture de juillet');
+    assert.equal(normalizeSubject('RE: FW: RE: Rapport'), 'Rapport');
+  });
+
+  it('gère les compteurs "[2]" et les variantes de casse / langue', () => {
+    assert.equal(normalizeSubject('Re[2]: Sujet'), 'Sujet');
+    assert.equal(normalizeSubject('AW: WG: Betreff'), 'Betreff');
+  });
+
+  it('ne touche pas un sujet qui commence par un mot en "re"', () => {
+    assert.equal(normalizeSubject('Rapport: bilan'), 'Rapport: bilan');
+    assert.equal(normalizeSubject('Retard de livraison'), 'Retard de livraison');
+  });
+
+  it('renvoie une chaîne vide pour un sujet absent', () => {
+    assert.equal(normalizeSubject(undefined), '');
+    assert.equal(normalizeSubject(''), '');
+  });
+
+  it('normalise les espaces de bord', () => {
+    assert.equal(normalizeSubject('  Re:   Sujet espacé  '), 'Sujet espacé');
   });
 });
 
