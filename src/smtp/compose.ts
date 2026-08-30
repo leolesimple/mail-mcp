@@ -1,7 +1,6 @@
 import MailComposer from 'nodemailer/lib/mail-composer/index.js';
-import { config } from '../config.js';
+import { account } from '../account.js';
 
-/** Pièce jointe prête à être encodée dans un message MIME. */
 export interface ComposeAttachment {
   filename: string;
   contentType?: string;
@@ -10,9 +9,8 @@ export interface ComposeAttachment {
   cid?: string;
 }
 
-/** Entrée de composition partagée par l'envoi SMTP et le brouillon IMAP. */
 export interface ComposeInput {
-  from?: string;
+  from?: string; // défaut : account.email
   to: string[];
   cc?: string[];
   bcc?: string[];
@@ -25,14 +23,13 @@ export interface ComposeInput {
 }
 
 /**
- * Compile un message MIME complet (avec Message-ID, Date, MIME-Version) en un
- * buffer RFC 5322. Extrait du `MailComposer` historiquement inline dans
- * `src/imap/drafts.ts` pour que l'envoi SMTP et l'APPEND IMAP partagent
- * exactement la même sérialisation.
+ * Fabrique MIME unique du projet. Produit le message RFC 5322 brut (avec un
+ * Message-ID généré) à partir d'une intention d'envoi. Utilisée par les
+ * brouillons IMAP et, à terme, par l'envoi SMTP.
  */
 export async function composeRaw(input: ComposeInput): Promise<Buffer> {
   return new MailComposer({
-    from: input.from ?? config.ICLOUD_EMAIL,
+    from: input.from ?? account.email,
     to: input.to,
     cc: input.cc,
     bcc: input.bcc,
@@ -41,7 +38,13 @@ export async function composeRaw(input: ComposeInput): Promise<Buffer> {
     html: input.html,
     inReplyTo: input.inReplyTo,
     references: input.references,
-    attachments: input.attachments,
+    attachments: input.attachments?.map((attachment) => ({
+      filename: attachment.filename,
+      contentType: attachment.contentType,
+      content: attachment.content,
+      contentDisposition: attachment.contentDisposition,
+      cid: attachment.cid,
+    })),
   })
     .compile()
     .build();
