@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
 import { classifySmtpError, SmtpMessageError, SmtpNetworkError } from './errors.js';
+import { checkSendAllowed } from './guards.js';
 
 const log = logger.child({ module: 'smtp' });
 
@@ -54,9 +55,17 @@ async function send(mailOptions: MailOptions): Promise<SendResult> {
 }
 
 export async function sendMail(message: OutgoingMessage): Promise<SendResult> {
-  if (!config.ENABLE_SENDING) {
+  // Filet de sécurité au niveau du transport : même un appel forgé qui
+  // contournerait l'orchestration de src/smtp/send.ts ne peut pas émettre.
+  // La branche `draft` est gérée en amont (send.ts) ; ici elle vaut refus.
+  const decision = checkSendAllowed({ to: message.to, cc: message.cc, bcc: message.bcc });
+  if (decision.action === 'deny') {
+    throw new SmtpMessageError(decision.reason);
+  }
+  if (decision.action === 'draft') {
     throw new SmtpMessageError(
-      "Envoi de messages désactivé (ENABLE_SENDING=false) : send_message et reply_message n'émettent rien tant que ce n'est pas réactivé dans .env.",
+      'DRAFTS_ONLY=true : passer par send_message / reply_message, qui déposent le message ' +
+        "en brouillon au lieu de l'envoyer.",
     );
   }
 
