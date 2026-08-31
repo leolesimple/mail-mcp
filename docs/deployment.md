@@ -34,6 +34,10 @@ le réseau `icloud-mail-mcp-net` du compose.
 
 ## 2. Préparer l'hôte
 
+Le déploiement ne compile rien sur l'hôte : `docker-compose.yml` tire l'image publiée sur
+`ghcr.io/leolesimple/icloud-mail-mcp` à chaque tag `v*`. Seuls le `docker-compose.yml` et le `.env`
+sont nécessaires — cloner le dépôt reste le plus simple pour les récupérer.
+
 ```bash
 git clone https://github.com/leolesimple/icloud-mail-mcp.git
 cd icloud-mail-mcp
@@ -47,7 +51,8 @@ ICLOUD_EMAIL=vous@icloud.com
 ICLOUD_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
 MCP_BEARER_TOKEN=<openssl rand -hex 32>
 TUNNEL_TOKEN=<le token copié à l'étape 1>
-ENABLE_SENDING=false      # à laisser à false pour la première mise en service
+ICLOUD_MAIL_MCP_VERSION=0.1.0   # version à déployer ("latest" pour suivre le dernier tag)
+ENABLE_SENDING=false            # à laisser à false pour la première mise en service
 ```
 
 ---
@@ -55,15 +60,19 @@ ENABLE_SENDING=false      # à laisser à false pour la première mise en servic
 ## 3. Lancer
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
+
+`docker compose` tire l'image GHCR (le paquet est public, aucune authentification requise) puis
+démarre les deux conteneurs. `cloudflared` attend que `icloud-mail-mcp` soit *healthy* avant
+d'ouvrir le tunnel.
 
 Vérifier :
 
 ```bash
-docker compose ps                    # les deux conteneurs doivent être "healthy"/"running"
-docker compose logs -f icloud-mail-mcp      # "icloud-mail-mcp http server listening"
-docker compose logs -f cloudflared   # "Registered tunnel connection"
+docker compose ps                          # les deux conteneurs "healthy"/"running"
+docker compose logs -f icloud-mail-mcp     # "icloud-mail-mcp http server listening"
+docker compose logs -f cloudflared         # "Registered tunnel connection"
 ```
 
 Puis, depuis n'importe où :
@@ -81,16 +90,25 @@ jamais de configuration ni de secret.
 
 Le [`Dockerfile`](../Dockerfile) est multi-étages : dépendances de développement pour compiler le
 TypeScript, dépendances de production seules dans l'image finale. Celle-ci ne contient ni le code
-source, ni les outils de build, tourne en utilisateur `node` non-root, et embarque un `HEALTHCHECK`
-qui interroge `/health`.
+source, ni les outils de build, tourne en utilisateur `node` non-root, pose `NODE_ENV=production`,
+et embarque un `HEALTHCHECK` qui interroge `/health`. L'image est construite pour `linux/amd64` par
+[`.github/workflows/release.yml`](../.github/workflows/release.yml) et poussée sur GHCR taguée
+`X.Y.Z` **et** `latest`.
 
 `.env` **n'est pas copié dans l'image** (il est dans `.dockerignore`) : il est injecté à l'exécution
-via `env_file`. L'image ne contient donc aucun secret et peut être reconstruite sans risque.
+via `env_file`. L'image ne contient donc aucun secret.
 
-### Tester en local sans tunnel
+### Tester en local (build depuis les sources)
 
-Décommenter la section `ports:` du service `icloud-mail-mcp` dans `docker-compose.yml`, puis viser
-`http://localhost:3000/mcp`. **À ne pas laisser en place sur une machine exposée.**
+`docker-compose.dev.yml` surcharge le service : build local au lieu du pull GHCR, et port publié
+sur l'hôte.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+curl http://localhost:3000/health
+```
+
+**À ne pas utiliser sur une machine exposée** : le port devient joignable hors du tunnel.
 
 ---
 
@@ -164,10 +182,16 @@ rapide de distinguer un problème de serveur d'un problème de modèle.
 
 ## Mise à jour
 
+Bumper `ICLOUD_MAIL_MCP_VERSION` dans `.env` vers le nouveau tag, puis :
+
 ```bash
-git pull
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
+
+Rien à compiler sur l'hôte, rien à `git pull` sauf si `docker-compose.yml` lui-même a changé.
+Revenir en arrière = remettre l'ancienne valeur et rejouer les deux commandes. Vérifier la version
+réellement en ligne : `curl https://icloud-mail-mcp.exemple.com/health`.
 
 Les sessions MCP en cours sont perdues au redémarrage ; les clients en rouvrent une automatiquement
 au prochain appel.
