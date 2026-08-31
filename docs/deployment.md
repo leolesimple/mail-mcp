@@ -70,11 +70,12 @@ Puis, depuis n'importe où :
 
 ```bash
 curl https://icloud-mail-mcp.exemple.com/health
-# {"status":"ok"}
+# {"status":"ok","version":"0.1.0"}
 ```
 
-Le `/health` répond sans token — c'est voulu, le healthcheck Docker en a besoin. Il ne révèle rien
-d'autre que le fait que le service tourne.
+Le `/health` répond sans token — c'est voulu, le healthcheck Docker en a besoin. Il ne révèle que le
+statut et la version du serveur (utile pour vérifier quelle image tourne après un déploiement),
+jamais de configuration ni de secret.
 
 ### Ce que fait l'image
 

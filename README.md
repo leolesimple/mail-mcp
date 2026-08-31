@@ -167,7 +167,8 @@ Ce serveur peut lire, déplacer, supprimer et envoyer des mails. Les points à n
   clic sur appleid.apple.com si le serveur est compromis.
 - **Commencez avec `ENABLE_SENDING=false`.** Vous rallumerez l'envoi quand vous aurez vu comment
   Claude se comporte sur votre boîte.
-- **Le healthcheck `/health` n'est pas authentifié** — il ne révèle que `{"status":"ok"}`.
+- **Le healthcheck `/health` n'est pas authentifié** — il ne révèle que le statut et la version
+  du serveur (`{"status":"ok","version":"…"}`), aucune configuration ni secret.
 
 Détail complet dans [`docs/security.md`](docs/security.md).
 
