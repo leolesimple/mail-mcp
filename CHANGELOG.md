@@ -18,7 +18,14 @@ versionnage [SemVer](https://semver.org/lang/fr/).
 
 ## [Non publié]
 
-_Rien pour l'instant._
+### Modifié
+
+- **Déploiement : tunnel externalisable.** `docker-compose.yml` ne contient plus
+  que le serveur, rattaché à un réseau Docker externe dont le nom vit dans `.env`
+  (`TUNNEL_NETWORK`) — pour un `cloudflared` géré par une autre stack. Le
+  `cloudflared` embarqué passe dans `docker-compose.tunnel.yml` (déploiement
+  autonome, opt-in). `docs/deployment.md` réécrit : installation en 2 fichiers
+  `curl`, sans `git clone`.
 
 ## [0.1.0] - 2026-08-31
 
