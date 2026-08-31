@@ -60,7 +60,7 @@ ICLOUD_EMAIL=vous@icloud.com
 ICLOUD_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
 MCP_BEARER_TOKEN=<openssl rand -hex 32>
 TUNNEL_NETWORK=tunnel-net              # le réseau de l'étape 1
-ICLOUD_MAIL_MCP_VERSION=0.1.0          # version à déployer ("latest" pour suivre le dernier tag)
+ICLOUD_MAIL_MCP_VERSION=0.1.1          # version à déployer ("latest" pour suivre le dernier tag)
 ENABLE_SENDING=false                   # à laisser à false pour la première mise en service
 # TUNNEL_TOKEN=...                     # modèle autonome uniquement
 ```
@@ -95,7 +95,7 @@ Vérifier :
 docker compose ps                          # "healthy"/"running"
 docker compose logs -f icloud-mail-mcp     # "icloud-mail-mcp http server listening"
 curl https://icloud-mail-mcp.exemple.com/health
-# {"status":"ok","version":"0.1.0"}
+# {"status":"ok","version":"0.1.1"}
 ```
 
 Le `/health` répond sans token — c'est voulu, le healthcheck Docker en a besoin. Il ne révèle que le
