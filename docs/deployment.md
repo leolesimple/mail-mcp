@@ -63,9 +63,13 @@ ENABLE_SENDING=false            # à laisser à false pour la première mise en 
 docker compose up -d
 ```
 
-`docker compose` tire l'image GHCR (le paquet est public, aucune authentification requise) puis
-démarre les deux conteneurs. `cloudflared` attend que `icloud-mail-mcp` soit *healthy* avant
-d'ouvrir le tunnel.
+`docker compose` tire l'image GHCR puis démarre les deux conteneurs. `cloudflared` attend que
+`icloud-mail-mcp` soit *healthy* avant d'ouvrir le tunnel.
+
+> Le paquet GHCR est privé par défaut à la première publication. Une fois : le rendre public
+> (*Packages → icloud-mail-mcp → Package settings → Change visibility*), ou, pour le garder privé,
+> `echo $TOKEN | docker login ghcr.io -u leolesimple --password-stdin` sur l'hôte avec un PAT
+> `read:packages`.
 
 Vérifier :
 
