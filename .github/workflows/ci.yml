@@ -55,7 +55,7 @@ jobs:
 
       # Construit exactement comme la release (linux/amd64), sans pousser :
       # un Dockerfile cassé fait échouer le CI au lieu de passer inaperçu.
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64
