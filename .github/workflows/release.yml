@@ -37,7 +37,7 @@ jobs:
       # Le CI complet (typecheck, lint, tests, build, image) tourne sur main
       # avant le tag ; on rejoue tests + build ici pour ne rien publier d'un
       # arbre qui ne compile pas.
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
