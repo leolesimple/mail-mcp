@@ -82,7 +82,7 @@ Concrètement, une fois branché, on peut demander à Claude :
   `.env`, plutôt que de découvrir la faute de frappe au premier appel d'outil.
 - **Deux transports** — HTTP streamable, ou stdio pour un branchement local (`MCP_TRANSPORT`).
 - **Logs structurés** (pino) sans mot de passe ni contenu de mail.
-- **333 tests** qui ne touchent ni le réseau ni une vraie boîte mail.
+- **340 tests** qui ne touchent ni le réseau ni une vraie boîte mail.
 
 ---
 
@@ -195,6 +195,7 @@ Détail complet dans [`docs/security.md`](docs/security.md).
 | [`docs/architecture.md`](docs/architecture.md) | Découpage en couches, pool IMAP, gestion des erreurs et des sessions |
 | [`docs/security.md`](docs/security.md) | Modèle de menace et bonnes pratiques |
 | [`docs/development.md`](docs/development.md) | Structure du code, tests, conventions |
+| [`CHANGELOG.md`](CHANGELOG.md) | Historique des versions et procédure de release |
 
 ---
 
