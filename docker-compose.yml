@@ -1,7 +1,7 @@
 services:
-  mail-mcp:
+  icloud-mail-mcp:
     build: .
-    container_name: mail-mcp
+    container_name: icloud-mail-mcp
     # Pour tester en local : decommente la ligne ci-dessous puis accede a http://localhost:3000
     # ports:
     #   - "3000:3000"
@@ -9,16 +9,16 @@ services:
       - .env
     restart: unless-stopped
     networks:
-      - mail-mcp-net
+      - icloud-mail-mcp-net
 
   cloudflared:
     image: cloudflare/cloudflared:2025.2
-    container_name: mail-mcp-cloudflared
-    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN} --url http://mail-mcp:3000
+    container_name: icloud-mail-mcp-cloudflared
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN} --url http://icloud-mail-mcp:3000
     restart: unless-stopped
     networks:
-      - mail-mcp-net
+      - icloud-mail-mcp-net
 
 networks:
-  mail-mcp-net:
+  icloud-mail-mcp-net:
     driver: bridge

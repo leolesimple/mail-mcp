@@ -5,7 +5,7 @@ l'hôte**, et un Cloudflare Tunnel qui expose le endpoint en HTTPS sans ouvrir d
 routeur.
 
 ```
-Internet ──HTTPS──▶ Cloudflare ──tunnel sortant──▶ cloudflared ──http://mail-mcp:3000──▶ mail-mcp
+Internet ──HTTPS──▶ Cloudflare ──tunnel sortant──▶ cloudflared ──http://icloud-mail-mcp:3000──▶ icloud-mail-mcp
                                                         └──── réseau bridge privé ────┘
 ```
 
@@ -23,20 +23,20 @@ Dans le dashboard [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) :
 2. Type **Cloudflared**, nommer le tunnel
 3. Choisir l'environnement **Docker** et copier le token affiché (une longue chaîne)
 4. Onglet **Public Hostname** → **Add a public hostname** :
-   - *Subdomain* : `mail-mcp` (par exemple)
+   - *Subdomain* : `icloud-mail-mcp` (par exemple)
    - *Domain* : votre domaine
-   - *Service* : **HTTP** → `mail-mcp:3000`
+   - *Service* : **HTTP** → `icloud-mail-mcp:3000`
 
 Le service pointe vers le **nom du conteneur**, pas vers `localhost` : les deux conteneurs partagent
-le réseau `mail-mcp-net` du compose.
+le réseau `icloud-mail-mcp-net` du compose.
 
 ---
 
 ## 2. Préparer l'hôte
 
 ```bash
-git clone https://github.com/leolesimple/mail-mcp.git
-cd mail-mcp
+git clone https://github.com/leolesimple/icloud-mail-mcp.git
+cd icloud-mail-mcp
 cp .env.example .env
 ```
 
@@ -62,14 +62,14 @@ Vérifier :
 
 ```bash
 docker compose ps                    # les deux conteneurs doivent être "healthy"/"running"
-docker compose logs -f mail-mcp      # "mail-mcp http server listening"
+docker compose logs -f icloud-mail-mcp      # "icloud-mail-mcp http server listening"
 docker compose logs -f cloudflared   # "Registered tunnel connection"
 ```
 
 Puis, depuis n'importe où :
 
 ```bash
-curl https://mail-mcp.exemple.com/health
+curl https://icloud-mail-mcp.exemple.com/health
 # {"status":"ok"}
 ```
 
@@ -88,7 +88,7 @@ via `env_file`. L'image ne contient donc aucun secret et peut être reconstruite
 
 ### Tester en local sans tunnel
 
-Décommenter la section `ports:` du service `mail-mcp` dans `docker-compose.yml`, puis viser
+Décommenter la section `ports:` du service `icloud-mail-mcp` dans `docker-compose.yml`, puis viser
 `http://localhost:3000/mcp`. **À ne pas laisser en place sur une machine exposée.**
 
 ---
@@ -118,7 +118,7 @@ fonctionne à l'identique dans les trois modes.
 ### Claude Code — HTTP (déploiement distant)
 
 ```bash
-claude mcp add --transport http mail-mcp https://mail-mcp.exemple.com/mcp \
+claude mcp add --transport http icloud-mail-mcp https://icloud-mail-mcp.exemple.com/mcp \
   --header "Authorization: Bearer <votre token>"
 ```
 
@@ -130,11 +130,11 @@ outils.
 Pour lancer le serveur en local, sans HTTP ni tunnel :
 
 ```bash
-claude mcp add mail-mcp -- \
+claude mcp add icloud-mail-mcp -- \
   env MCP_TRANSPORT=stdio \
       ICLOUD_EMAIL=vous@icloud.com ICLOUD_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx \
       MCP_BEARER_TOKEN=$(openssl rand -hex 16) \
-  node /chemin/vers/mail-mcp/dist/index.js
+  node /chemin/vers/icloud-mail-mcp/dist/index.js
 ```
 
 (ou `npx tsx src/index.ts` en développement). Le client démarre le processus lui-même ; `PORT`
@@ -145,14 +145,14 @@ convient.
 ### Claude Desktop / claude.ai
 
 *Paramètres → Connecteurs → Ajouter un connecteur personnalisé*, avec l'URL
-`https://mail-mcp.exemple.com/mcp`.
+`https://icloud-mail-mcp.exemple.com/mcp`.
 
 ### MCP Inspector (débogage)
 
 ```bash
 npx @modelcontextprotocol/inspector
 # Transport : Streamable HTTP
-# URL       : https://mail-mcp.exemple.com/mcp
+# URL       : https://icloud-mail-mcp.exemple.com/mcp
 # Header    : Authorization: Bearer <votre token>
 ```
 
@@ -180,7 +180,7 @@ au prochain appel.
 | `Configuration invalide` au démarrage | Une variable manque ou est mal formée — le message liste précisément lesquelles. |
 | `Authentification iCloud IMAP refusée` | Mot de passe principal utilisé à la place d'un mot de passe d'application, ou mot de passe révoqué. |
 | `401` sur `/mcp`, `/health` OK | Token absent ou différent de `MCP_BEARER_TOKEN`. Vérifier le préfixe `Bearer ` et l'absence d'espace parasite. |
-| `502` Cloudflare | Le conteneur `mail-mcp` est arrêté, ou le hostname public pointe vers le mauvais port/nom de service. |
+| `502` Cloudflare | Le conteneur `icloud-mail-mcp` est arrêté, ou le hostname public pointe vers le mauvais port/nom de service. |
 | Erreurs IMAP intermittentes | Throttling iCloud. Baisser `IMAP_POOL_SIZE`, ou espacer les appels. |
 | Le tunnel ne se connecte pas | `TUNNEL_TOKEN` invalide ou tunnel supprimé côté Cloudflare. |
 | En stdio, le client MCP n'obtient jamais de réponse | Quelque chose écrit sur stdout du processus (wrapper qui fait `2>&1`, `console.log` ajouté, autre lib bavarde). stdout est réservé au JSON-RPC. |

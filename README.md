@@ -1,6 +1,6 @@
-# mail-mcp
+# icloud-mail-mcp
 
-[![CI](https://github.com/leolesimple/mail-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/leolesimple/mail-mcp/actions/workflows/ci.yml)
+[![CI](https://github.com/leolesimple/icloud-mail-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/leolesimple/icloud-mail-mcp/actions/workflows/ci.yml)
 
 Serveur [MCP](https://modelcontextprotocol.io) qui expose un compte **iCloud Mail** (IMAP/SMTP) sous
 forme d'outils utilisables par Claude : lire, chercher, trier, répondre et archiver des mails depuis
@@ -11,7 +11,7 @@ transite par un service tiers : Claude parle directement à votre instance, qui 
 iCloud.
 
 ```
-Claude  ──HTTPS+Bearer──▶  Cloudflare Tunnel  ──▶  mail-mcp  ──IMAP/SMTP+TLS──▶  iCloud
+Claude  ──HTTPS+Bearer──▶  Cloudflare Tunnel  ──▶  icloud-mail-mcp  ──IMAP/SMTP+TLS──▶  iCloud
 ```
 
 > **Licence — à lire avant de cloner.** Ce projet **n'est pas open source**. Vous pouvez le
@@ -94,15 +94,15 @@ Concrètement, une fois branché, on peut demander à Claude :
   en IMAP/SMTP :
   1. [appleid.apple.com](https://appleid.apple.com/) → se connecter
   2. **Connexion et sécurité** → **Mots de passe pour applications** → **Générer un mot de passe**
-  3. Nommer (« mail-mcp ») et copier le mot de passe au format `xxxx-xxxx-xxxx-xxxx`
+  3. Nommer (« icloud-mail-mcp ») et copier le mot de passe au format `xxxx-xxxx-xxxx-xxxx`
 
 ---
 
 ## Démarrage rapide
 
 ```bash
-git clone https://github.com/leolesimple/mail-mcp.git
-cd mail-mcp
+git clone https://github.com/leolesimple/icloud-mail-mcp.git
+cd icloud-mail-mcp
 npm install
 npm run auth
 ```
@@ -144,12 +144,12 @@ Pour le déploiement Docker + Cloudflare Tunnel, voir [`docs/deployment.md`](doc
 **Claude Code** :
 
 ```bash
-claude mcp add --transport http mail-mcp https://mail-mcp.exemple.com/mcp \
+claude mcp add --transport http icloud-mail-mcp https://icloud-mail-mcp.exemple.com/mcp \
   --header "Authorization: Bearer <votre token>"
 ```
 
 **Claude Desktop / claude.ai** : *Paramètres → Connecteurs → Ajouter un connecteur personnalisé*,
-en donnant l'URL `https://mail-mcp.exemple.com/mcp`.
+en donnant l'URL `https://icloud-mail-mcp.exemple.com/mcp`.
 
 Détails et dépannage dans [`docs/deployment.md`](docs/deployment.md#brancher-un-client-mcp).
 

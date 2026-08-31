@@ -1,5 +1,5 @@
 {
-  "name": "mail-mcp",
+  "name": "icloud-mail-mcp",
   "private": true,
   "version": "0.1.0",
   "description": "MCP server exposing iCloud Mail (IMAP/SMTP) as tools for Claude",

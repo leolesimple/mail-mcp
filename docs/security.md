@@ -98,7 +98,7 @@ limit — voir la section *Les garde-fous d'envoi*.
 ### Le mot de passe d'application Apple
 
 - Il donne accès à **toute** la boîte mail, pas seulement à ce serveur.
-- Créez-en un **dédié** à mail-mcp : vous pourrez le révoquer sans casser vos autres appareils.
+- Créez-en un **dédié** à icloud-mail-mcp : vous pourrez le révoquer sans casser vos autres appareils.
 - Révocation immédiate sur [appleid.apple.com](https://appleid.apple.com/) → *Connexion et
   sécurité* → *Mots de passe pour applications*, au moindre doute.
 
